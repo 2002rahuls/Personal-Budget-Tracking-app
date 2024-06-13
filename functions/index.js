@@ -3,13 +3,13 @@ const logger = require("firebase-functions/logger");
 
 const functions = require("firebase-functions");
 const express = require("express");
-const { admin, db } = require("./firebase");
+const { admin, db } = require("./firebase"); // firebase configuration
 
-const app = express();
+const app = express(); //express app started
 
-app.use(express.json());
+app.use(express.json()); //Middleware for JSON bodies
 
-// POST /expense/signup
+// POST - NEW USER SignUp - /expense/signup
 app.post("/expense/signup", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -19,11 +19,11 @@ app.post("/expense/signup", async (req, res) => {
     });
     res.json({ status: "Success", user: userRecord });
   } catch (error) {
-    res.json({ error: error.message });
+    res.json({ error: error.message }); //error handling if any
   }
 });
 
-// POST /expense/login
+// POST - USER LOGIN - /expense/login
 app.post("/expense/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -31,76 +31,77 @@ app.post("/expense/login", async (req, res) => {
     const token = await admin.auth().createCustomToken(user.uid);
     res.json({ status: "Success", token });
   } catch (error) {
-    res.json({ error: error.message });
+    res.json({ error: error.message }); //error handling if any
   }
 });
 
-// GET /expenses
+// GET - Retrieve all expenses - /expenses
 app.get("/expenses", async (req, res) => {
   try {
     const snapshot = await db.collection("expense").get();
-    const users = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    res.json(users);
+    const Expense = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    res.json(Expense);
   } catch (error) {
-    res.json({ error: error.message });
+    res.json({ error: error.message }); //error handling if any
   }
 });
 
-// GET /expense/:id
+// GET - Retrieve a particular - /expense/:id
 app.get("/expense/:id", async (req, res) => {
   try {
-    const userDoc = await db.collection("expense").doc(req.params.id).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "Data not found" });
+    // Fetch expense document using id from Firestore
+    const ExpenseDoc = await db.collection("expense").doc(req.params.id).get();
+    // Check if document with given id exists
+    if (!ExpenseDoc.exists) {
+      return res.json({ error: "Data not found" });
     }
-    res.json({ id: userDoc.id, ...userDoc.data() });
+    res.json({ id: ExpenseDoc.id, ...ExpenseDoc.data() });
   } catch (error) {
-    res.json({ error: error.message });
+    res.json({ error: error.message }); //error handling if any
   }
 });
 
-// POST /expense
+// POST- Add a new expense - /expense
 app.post("/expense", async (req, res) => {
   try {
-    const newUser = req.body;
-    newUser.date = new Date(); //add date
-    const userRef = await db.collection("expense").add(newUser);
-    res.json({ status: "Success", id: userRef.id });
+    const newExpense = req.body; // Extract
+    newExpense.date = new Date(); //add date to new data
+    const ExpenseRef = await db.collection("expense").add(newExpense); //Add new expense to firestore
+    res.json({ status: "Success", id: ExpenseRef.id });
   } catch (error) {
-    res.json({ error: error.message });
+    res.json({ error: error.message }); //error handling if any
   }
 });
 
-// DELETE /expense/:id
+// DELETE - Delete an expense - /expense/:id
 app.delete("/expense/:id", async (req, res) => {
   try {
-    const userRef = db.collection("expense").doc(req.params.id);
-    await userRef.delete();
+    const ExpenseRef = db.collection("expense").doc(req.params.id); // creating a reference to the data using id
+    await ExpenseRef.delete(); //Delete document from firestore
     res.json({ status: "success" });
   } catch (error) {
-    res.json({ error: error.message });
+    res.json({ error: error.message }); //error handling if any
   }
 });
 
-// PUT /expense/:id
+// PUT - update an existing expense - /expense/:id
 app.put("/expense/:id", async (req, res) => {
   try {
-    const id = req.params.id;
-    const newExpenseDetails = req.body;
-    newExpenseDetails.date = new Date();
-    const userRef = db.collection("expense").doc(id);
-    const userDoc = await userRef.get();
-    // Checks if User with given id exist
-    if (!userDoc.exists) {
+    const id = req.params.id; //expense id from request parameters
+    const newExpenseDetails = req.body; //Extracting new data to be updated from request body
+    newExpenseDetails.date = new Date(); // Add current date to the new Expense data
+    const ExpenseRef = db.collection("expense").doc(id);
+    const ExpenseDoc = await ExpenseRef.get();
+    // Checks if expense with given id exists
+    if (!ExpenseDoc.exists) {
       console.error(`Document with ID ${id} not found`);
       return res.json({ error: "Expense not found" });
     }
-    await userRef.set(newExpenseDetails, { merge: true });
+    await ExpenseRef.set(newExpenseDetails, { merge: true }); //update the original document with new detail & keep existing fields
     res.json({ status: "success", expense: { id, ...newExpenseDetails } });
   } catch (error) {
-    res.json({ error: error.message });
+    res.json({ error: error.message }); //error handling if any
   }
 });
 
-// Export the app as HTTP functions
-exports.api = functions.https.onRequest(app);
+exports.api = functions.https.onRequest(app); // Export  functions
