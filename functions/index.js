@@ -63,7 +63,7 @@ app.get("/expense/:id", async (req, res) => {
 app.post("/expense", async (req, res) => {
   try {
     const newUser = req.body;
-    newUser.date = new Date();
+    newUser.date = new Date(); //add date
     const userRef = await db.collection("expense").add(newUser);
     res.json({ status: "Success", id: userRef.id });
   } catch (error) {
