@@ -90,9 +90,10 @@ app.put("/expense/:id", async (req, res) => {
     newExpenseDetails.date = new Date();
     const userRef = db.collection("expense").doc(id);
     const userDoc = await userRef.get();
+    // Checks if User with given id exist
     if (!userDoc.exists) {
       console.error(`Document with ID ${id} not found`);
-      return res.status(404).json({ error: "Expense not found" });
+      return res.json({ error: "Expense not found" });
     }
     await userRef.set(newExpenseDetails, { merge: true });
     res.json({ status: "success", expense: { id, ...newExpenseDetails } });
