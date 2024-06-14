@@ -39,9 +39,9 @@ app.post("/expense/login", async (req, res) => {
 // GET - Retrieve all expenses - /expenses
 app.get("/expenses", async (req, res) => {
   try {
-    const snapshot = await db.collection("expense").get();
-    const Expense = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    res.json(Expense); // respond with data
+    const snapshot = await db.collection("expense").get(); // Fetch all expense documents from firestore
+    const Expense = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })); //Map documents to array of expense objects
+    res.json(Expense); // respond with array of expenses
   } catch (error) {
     res.json({ error: error.message }); //error handling if any
   }
