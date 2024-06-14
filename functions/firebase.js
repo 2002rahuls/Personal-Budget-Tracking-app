@@ -1,5 +1,5 @@
-const admin = require("firebase-admin");
-const serviceAccount = require("./personal-budget-tracker-cd477-firebase-adminsdk-jkmdk-b05cf2de74.json");
+const admin = require("firebase-admin"); // import firebase admin sdk for authentication
+const serviceAccount = require("./personal-budget-tracker-cd477-firebase-adminsdk-jkmdk-b05cf2de74.json"); // import service account of thee project
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -9,4 +9,4 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-module.exports = { admin, db };
+module.exports = { admin, db }; // export function
