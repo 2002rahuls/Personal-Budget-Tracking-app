@@ -24,6 +24,29 @@ app.post("/expense/signup", async (req, res) => {
   }
 });
 
+// POST - USER LOGIN - /expense/login
+app.post("/expense/login", async (req, res) => {
+  try {
+    const { email, password } = req.body; // extract email and password from request body
+    const user = await admin.auth().getUserByEmail(email); //// Get user by email from Firebase Authentication
+    const token = await admin.auth().createCustomToken(user.uid); //custom token creation
+    res.json({ status: "Success", token }); // respond success and token
+  } catch (error) {
+    res.json({ error: error.message }); //error handling if any
+  }
+});
+
+// GET - Retrieve all expenses - /expenses
+app.get("/expenses", async (req, res) => {
+  try {
+    const snapshot = await db.collection("expense").get();
+    const Expense = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    res.json(Expense); // respond with data
+  } catch (error) {
+    res.json({ error: error.message }); //error handling if any
+  }
+});
+
 // GET - Retrieve a particular - /expense/:id
 app.get("/expense/:id", async (req, res) => {
   try {
