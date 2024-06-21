@@ -13,6 +13,9 @@ app.use(express.json()); //Middleware for JSON bodies
 app.post("/expense/signup", async (req, res) => {
   try {
     const { email, password } = req.body; // extract email and password from request body
+    if (!email || !password) {
+      return res.json({ error: " Invalid email and password" });
+    }
     //create new user for firebase authentication
     const userRecord = await admin.auth().createUser({
       email,
@@ -65,10 +68,27 @@ app.get("/expense/:id", async (req, res) => {
 // POST- Add a new expense - /expense
 app.post("/expense", async (req, res) => {
   try {
-    const newExpense = req.body; // Extract
+    const newExpense = req.body; // Extract //category/amount/description
+
     newExpense.date = new Date(); //add date to new data
-    const ExpenseRef = await db.collection("expense").add(newExpense); //Add new expense to firestore
-    res.json({ status: "Success", id: ExpenseRef.id }); // respond with success and New Expense id
+    let ExpenseRef = {};
+    ExpenseRef.amount = Number(newExpense.amount);
+    ExpenseRef.category = newExpense.category;
+    ExpenseRef.description = newExpense.description;
+    ExpenseRef.date = newExpense.date;
+
+    if (ExpenseRef.category && ExpenseRef.amount && ExpenseRef.description) {
+      const ExpenseNew = await db.collection("expense").add(ExpenseRef); //Add new expense to firestore
+      res.json({ status: "Success", id: ExpenseNew.id }); // respond with success and New Expense id
+    } else if (!ExpenseRef.category) {
+      res.status(400).json({ error: "Invalid category" });
+    } else if (!ExpenseRef.amount) {
+      res.status(400).json({ error: "Invalid amount" });
+    } else if (!ExpenseRef.description) {
+      res.status(400).json({ error: "Invalid description" });
+    } else {
+      res.json({ error: " Inavlid Inputs" });
+    }
   } catch (error) {
     res.json({ error: error.message }); //error handling if any
   }
