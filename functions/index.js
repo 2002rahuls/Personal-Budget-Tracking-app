@@ -1,9 +1,10 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
-
-const functions = require("firebase-functions"); // import firebase-functions
-const express = require("express"); // impor express
+const express = require("express"); // import express
 const { admin, db } = require("./firebase"); // firebase configuration
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { onDocumentDeleted } = require("firebase-functions/v2/firestore");
 
 const app = express(); //express app started
 
@@ -97,7 +98,15 @@ app.post("/expense", async (req, res) => {
 // DELETE - Delete an expense - /expense/:id
 app.delete("/expense/:id", async (req, res) => {
   try {
-    const ExpenseRef = db.collection("expense").doc(req.params.id); // creating a reference to the data using id
+    const id = req.params.id; //get id from request
+    const ExpenseRef = db.collection("expense").doc(id); // reference to the expense document by id
+    const ExpenseDoc = await ExpenseRef.get(); // Fetch the document if any with given id
+    // Checks if expense data with given id exists
+    if (!ExpenseDoc.exists) {
+      console.error(`Document with ID ${id} not found`);
+      return res.json({ error: "Expense not found" });
+    }
+
     await ExpenseRef.delete(); //Delete document from firestore
     res.json({ status: "success" }); // respond "success" on successfully deleting the data
   } catch (error) {
@@ -125,4 +134,43 @@ app.put("/expense/:id", async (req, res) => {
   }
 });
 
-exports.api = functions.https.onRequest(app); // Export function
+exports.api = onRequest(app); // Export function
+
+//Triggers
+
+//Trigger for creation of new doc
+exports.onExpenseCreate = onDocumentCreated("expense/{expenseId}", (event) => {
+  const newValue = event.data.data();
+  logger.log("New Expense created in DB");
+  console.log("New expense created:", newValue);
+  return null;
+});
+
+//trigger for data updatation
+exports.onExpenseUpdated = onDocumentUpdated("expense/{expensId}", (event) => {
+  const beforeValue = event.data.before.data(); //get data before updation
+  const afterValue = event.data.after.data(); // get Data after updation
+
+  // function to get only updated data
+  const getUpdatedValue = (beforeValue, afterValue) => {
+    const updatedValue = {};
+    for (const key in afterValue) {
+      if (afterValue[key] !== beforeValue[key]) {
+        updatedValue[key] = afterValue[key];
+      }
+    }
+    return updatedValue;
+  };
+
+  const updatedData = getUpdatedValue(beforeValue, afterValue); //function call
+  logger.log("Data Updated");
+  console.log("Data updated as : ", updatedData);
+  return null;
+});
+//trigger for data deletion
+exports.onExpenseDeleted = onDocumentDeleted("expense/{expenseId}", (event) => {
+  const deletedData = event.data.data();
+  logger.log("Data Deleted");
+  console.log("Data Deleted :", deletedData);
+  return null;
+});
