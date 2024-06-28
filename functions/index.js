@@ -191,7 +191,7 @@ app.post("/generate-pdf", async (req, res) => {
       { data }
     );
 
-    // Define the local path where you want to store the PDF
+    // Define the local path
     const localPath = path.join(
       "C:",
       "Users",
@@ -207,7 +207,7 @@ app.post("/generate-pdf", async (req, res) => {
         return res.status(500).json({ error: error.message });
       }
 
-      // Send the local file path as the response
+      // Send success as the response
       res.json({ status: "Success" });
     });
   } catch (error) {
