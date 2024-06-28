@@ -6,7 +6,12 @@ const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onDocumentDeleted } = require("firebase-functions/v2/firestore");
 
-const app = express(); //express app started
+// const fs = require("fs");
+const path = require("path");
+const ejs = require("ejs");
+const pdf = require("html-pdf");
+
+const app = express();
 
 app.use(express.json()); //Middleware for JSON bodies
 
@@ -74,22 +79,44 @@ app.post("/expense", async (req, res) => {
     newExpense.date = new Date(); //add date to new data
     let ExpenseRef = {};
     ExpenseRef.amount = Number(newExpense.amount);
-    ExpenseRef.category = newExpense.category;
+    ExpenseRef.category = newExpense.category.toUpperCase();
     ExpenseRef.description = newExpense.description;
     ExpenseRef.date = newExpense.date;
 
-    if (ExpenseRef.category && ExpenseRef.amount && ExpenseRef.description) {
-      const ExpenseNew = await db.collection("expense").add(ExpenseRef); //Add new expense to firestore
-      res.json({ status: "Success", id: ExpenseNew.id }); // respond with success and New Expense id
-    } else if (!ExpenseRef.category) {
-      res.status(400).json({ error: "Invalid category" });
+    const validCategory = [
+      "CASH",
+      "UPI",
+      "CHEQUE",
+      "NETBANKING",
+      "BANK TRANSFER",
+      "CREDIT CARD",
+    ];
+
+    if (!ExpenseRef.category || !ExpenseRef.amount || !ExpenseRef.description) {
+      res.status(400).json({ error: "invalid inputs" });
+    } else if (!validCategory.includes(ExpenseRef.category)) {
+      res.json({ error: "Invalid Category", valid: validCategory });
     } else if (!ExpenseRef.amount) {
       res.status(400).json({ error: "Invalid amount" });
     } else if (!ExpenseRef.description) {
       res.status(400).json({ error: "Invalid description" });
     } else {
-      res.json({ error: " Inavlid Inputs" });
+      const ExpenseNew = await db.collection("expense").add(ExpenseRef); //Add new expense to firestore
+      res.json({ status: "Success", id: ExpenseNew.id }); // respond with success and New Expense id
     }
+
+    // if (ExpenseRef.category && ExpenseRef.amount && ExpenseRef.description) {
+    //   const ExpenseNew = await db.collection("expense").add(ExpenseRef); //Add new expense to firestore
+    //   res.json({ status: "Success", id: ExpenseNew.id }); // respond with success and New Expense id
+    // } else if (!ExpenseRef.category) {
+    //   res.status(400).json({ error: "Invalid category" });
+    // } else if (!ExpenseRef.amount) {
+    //   res.status(400).json({ error: "Invalid amount" });
+    // } else if (!ExpenseRef.description) {
+    //   res.status(400).json({ error: "Invalid description" });
+    // } else {
+    //   res.json({ error: " Inavlid Inputs" });
+    // }
   } catch (error) {
     res.json({ error: error.message }); //error handling if any
   }
@@ -133,9 +160,65 @@ app.put("/expense/:id", async (req, res) => {
     res.json({ error: error.message }); //error handling if any
   }
 });
+//--------------------------------------------------------------------------------------------------------------------
+//pdf generation api
+
+app.post("/generate-pdf", async (req, res) => {
+  try {
+    const snapshot = await db.collection("expense").get();
+
+    const data = snapshot.docs.map((doc) => {
+      const docData = doc.data();
+      // console.log(docData.date);
+      const timestamp = docData.date; //storing date in form of firestore timestamp
+      const jsDate = timestamp.toDate(); // storing date in Javascript format
+      //Converting date into IST time format i.e. timezone=Asia/Kolkata
+      const formattedDate = jsDate.toLocaleString(undefined, {
+        timeZone: "Asia/Kolkata",
+      });
+      // console.log(formattedDate);
+      return {
+        id: doc.id,
+        formattedDate: formattedDate,
+        jsDate: jsDate,
+        ...docData,
+      };
+    });
+
+    // Generating HTML content using EJS, sending passing NewData to template.ejs
+    const htmlContent = await ejs.renderFile(
+      path.join(__dirname, "template.ejs"),
+      { data }
+    );
+
+    // Define the local path where you want to store the PDF
+    const localPath = path.join(
+      "C:",
+      "Users",
+      "Rahul",
+      "Downloads",
+      "output.pdf"
+    );
+
+    // Create PDF from HTML content
+    pdf.create(htmlContent).toFile(localPath, (error, result) => {
+      if (error) {
+        console.error(error);
+        return res.status(500).json({ error: error.message });
+      }
+
+      // Send the local file path as the response
+      res.json({ status: "Success" });
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 exports.api = onRequest(app); // Export function
 
+//--------------------------------------------------------------------------------------------------------------------
 //Triggers
 
 //Trigger for creation of new doc
@@ -147,7 +230,7 @@ exports.onExpenseCreate = onDocumentCreated("expense/{expenseId}", (event) => {
 });
 
 //trigger for data updatation
-exports.onExpenseUpdated = onDocumentUpdated("expense/{expensId}", (event) => {
+exports.onExpenseUpdated = onDocumentUpdated("expense/{expenseId}", (event) => {
   const beforeValue = event.data.before.data(); //get data before updation
   const afterValue = event.data.after.data(); // get Data after updation
 
@@ -167,6 +250,7 @@ exports.onExpenseUpdated = onDocumentUpdated("expense/{expensId}", (event) => {
   console.log("Data updated as : ", updatedData);
   return null;
 });
+
 //trigger for data deletion
 exports.onExpenseDeleted = onDocumentDeleted("expense/{expenseId}", (event) => {
   const deletedData = event.data.data();
