@@ -165,6 +165,22 @@ app.put("/expense/:id", async (req, res) => {
 
 app.post("/generate-pdf", async (req, res) => {
   try {
+    const validCategory = [
+      "CASH",
+      "UPI",
+      "CHEQUE",
+      "NETBANKING",
+      "BANK TRANSFER",
+      "CREDIT CARD",
+      "ALL",
+    ];
+
+    const ReqCategory = req.body.category.toUpperCase(); //Extracting category and storing it in variable in uppercase form
+    //check if category provided is valid or not
+    if (!validCategory.includes(ReqCategory)) {
+      res.json({ error: "Invalid Category", valid: validCategory });
+    }
+
     const snapshot = await db.collection("expense").get();
 
     const data = snapshot.docs.map((doc) => {
@@ -184,11 +200,18 @@ app.post("/generate-pdf", async (req, res) => {
         ...docData,
       };
     });
+    data.sort((a, b) => a.jsDate - b.jsDate); ///Sorting according to date
+    //condition for filtering the elements
+    if (ReqCategory === "ALL") {
+      var NewData = data;
+    } else {
+      var NewData = data.filter((doc) => doc.category === ReqCategory);
+    }
 
     // Generating HTML content using EJS, sending passing NewData to template.ejs
     const htmlContent = await ejs.renderFile(
       path.join(__dirname, "template.ejs"),
-      { data }
+      { NewData }
     );
 
     // Define the local path
