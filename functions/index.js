@@ -281,7 +281,7 @@ const getBrowserInstance = async () => {
   });
 };
 
-app.post("/generate-pdf-3", async (req, res) => {
+app.post("/generate-pdf-deploy", async (req, res) => {
   const ReqCategory = req.body.category.toUpperCase();
   const validCategory = [
     "CASH",
