@@ -271,22 +271,25 @@ app.put("/expense/:id", async (req, res) => {
 //   }
 // });
 
+// function for pdf generation, storing in cloud bucket and returning its public URL
 const generatePDF = async (data) => {
+  //// Generating HTML content using EJS, sending passing NewData to template.ejs
   const htmlContent = await ejs.renderFile(
     path.join(__dirname, "template.ejs"),
     { NewData: data }
   );
-  const fileName = `table-data-${Date.now()}.pdf`;
+
+  const fileName = `table-data-${Date.now()}.pdf`; //assigning file name by using date for uniqueness
   const browser = await puppeteer.launch({
-    args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
-    defaultViewport: chromium.defaultViewport,
+    args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"], // include default chromium arguments and disable Chromium sandbox and setuid sandbox
+    defaultViewport: chromium.defaultViewport, // standard viewport settings
     executablePath: await chromium.executablePath,
-    headless: chromium.headless,
+    headless: chromium.headless, //chromium runs in headless mode (serverless environments)
   });
 
   const page = await browser.newPage();
   await page.setContent(htmlContent);
-  const pdfBuffer = await page.pdf({ format: "A4" });
+  const pdfBuffer = await page.pdf({ format: "A4" }); // page formatting
   await browser.close();
 
   const file = bucket.file(fileName);
@@ -305,31 +308,33 @@ app.post("/generate-pdf", async (req, res) => {
     "CREDIT CARD",
     "ALL",
   ];
-
+  //Check input data is  valid or not
   if (!validCategory.includes(reqCategory)) {
     return res.json({ error: "Invalid Category", valid: validCategory });
   }
 
   try {
-    const snapshot = await db.collection("expense").get();
+    const snapshot = await db.collection("expense").get(); // get all data from firestore
     const data = snapshot.docs.map((doc) => {
       const docData = doc.data();
-      const jsDate = docData.date.toDate();
+      const jsDate = docData.date.toDate(); //convert the date into proper javascript format of milliseconds
+      //convert the javascript date to String format according to the INDIAN STANDARD TIME (IST)
       const formattedDate = jsDate.toLocaleString(undefined, {
         timeZone: "Asia/Kolkata",
       });
       return { id: doc.id, formattedDate, jsDate, ...docData };
     });
 
-    data.sort((a, b) => a.jsDate - b.jsDate);
+    data.sort((a, b) => a.jsDate - b.jsDate); // Sorting the data according to the date
     let filterData;
+    //filter data as per request by user
     if (reqCategory === "ALL") {
       filterData = data;
     } else {
       filterData = data.filter((doc) => doc.category === reqCategory);
     }
 
-    const url = await generatePDF(filterData);
+    const url = await generatePDF(filterData); //function call
 
     res.json({ link: url });
   } catch (error) {
@@ -338,7 +343,7 @@ app.post("/generate-pdf", async (req, res) => {
   }
 });
 
-exports.api = onRequest({ memory: "2GiB", timeout: 120 }, app); // Export function
+exports.api = onRequest({ memory: "2GiB", timeout: 120 }, app); // Export function for API with memory allocation of 2Gib and timeout of 120 seconds
 
 //Triggers
 
