@@ -5,11 +5,14 @@ const { admin, db } = require("./firebase"); // firebase configuration
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onDocumentDeleted } = require("firebase-functions/v2/firestore");
-
-// const fs = require("fs");
 const path = require("path");
 const ejs = require("ejs");
-const pdf = require("html-pdf");
+const puppeteer = require("puppeteer");
+const chromium = require("chrome-aws-lambda");
+const { Storage } = require("@google-cloud/storage");
+const storage = new Storage();
+const bucketName = "personal-budget-tracking-table-data";
+const bucket = storage.bucket(bucketName);
 
 const app = express();
 
@@ -88,7 +91,6 @@ app.post("/expense", async (req, res) => {
       "UPI",
       "CHEQUE",
       "NETBANKING",
-      "BANK TRANSFER",
       "CREDIT CARD",
     ];
 
@@ -160,88 +162,184 @@ app.put("/expense/:id", async (req, res) => {
     res.json({ error: error.message }); //error handling if any
   }
 });
-//--------------------------------------------------------------------------------------------------------------------
+
 //pdf generation api
 
-app.post("/generate-pdf", async (req, res) => {
-  try {
-    const validCategory = [
-      "CASH",
-      "UPI",
-      "CHEQUE",
-      "NETBANKING",
-      "BANK TRANSFER",
-      "CREDIT CARD",
-      "ALL",
-    ];
+// code for pdf generation in local env
+app.post("/generate-pdf-local", async (req, res) => {
+  const ReqCategory = req.body.category.toUpperCase(); //Extracting category and storing it in variable in uppercase form
+  const validCategory = [
+    "CASH",
+    "UPI",
+    "CHEQUE",
+    "NETBANKING",
+    "CREDIT CARD",
+    "ALL",
+  ];
+  //check if category provided is valid or not
+  if (validCategory.includes(ReqCategory)) {
+    try {
+      const snapshot = await db.collection("expense").get(); //get the snapshot of all datasets
+      const data = snapshot.docs.map((doc) => {
+        const docData = doc.data();
+        // console.log(docData.date);
+        const timestamp = docData.date; //storing date in form of firestore timestamp
+        const jsDate = timestamp.toDate(); // storing date in Javascript format
+        //Converting date into IST time format i.e. timezone=Asia/Kolkata
+        const formattedDate = jsDate.toLocaleString(undefined, {
+          timeZone: "Asia/Kolkata",
+        });
+        // console.log(formattedDate);
+        return {
+          id: doc.id,
+          formattedDate: formattedDate,
+          jsDate: jsDate,
+          ...docData,
+        };
+      });
+      data.sort((a, b) => a.jsDate - b.jsDate); ///Sorting according to date
+      //condition for filtering the elements
+      if (ReqCategory === "ALL") {
+        var NewData = data;
+      } else {
+        var NewData = data.filter((doc) => doc.category === ReqCategory);
+      }
 
-    const ReqCategory = req.body.category.toUpperCase(); //Extracting category and storing it in variable in uppercase form
-    //check if category provided is valid or not
-    if (!validCategory.includes(ReqCategory)) {
-      res.json({ error: "Invalid Category", valid: validCategory });
+      // Generating HTML content using EJS, sending passing NewData to template.ejs
+      const htmlContent = await ejs.renderFile(
+        path.join(__dirname, "template.ejs"),
+        { NewData }
+      );
+
+      // // Define the local path
+      // const localPath = path.join(
+      //   "C:",
+      //   "Users",
+      //   "Rahul",
+      //   "Downloads",
+      //   "output.pdf"
+      // );
+
+      // Create PDF from HTML content
+      // pdf.create(htmlContent).toFile(localPath, (error, result) => {
+      //   if (error) {
+      //     console.error(error);
+      //     return res.status(500).json({ error: error.message });
+      //   }
+
+      //   // Send success as the response
+      //   res.json({ status: "Success" });
+      // });
+      // pdf.create(htmlContent).toBuffer(async (error, buffer) => {
+      //   if (error) {
+      //     return res.json({ error: error.message });
+      //   }
+
+      //   const fileName = `table-data-${Date.now()}.pdf`;
+      //   const file = bucket.file(fileName);
+
+      //   await file.save(buffer);
+
+      //   const URL = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+
+      //   res.json({ link: URL });
+      // });
+
+      const browser = await puppeteer.launch({
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      });
+
+      const page = await browser.newPage();
+      await page.setContent(htmlContent);
+      const pdfBuffer = await page.pdf({ format: "A4" });
+      await browser.close();
+
+      const fileName = `table-data-${Date.now()}.pdf`;
+      const file = bucket.file(fileName);
+
+      await file.save(pdfBuffer);
+
+      const URL = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+
+      res.json({ link: URL });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: error.message, stack: error.stack });
     }
+  } else {
+    return res.json({ error: "Invalid Category", valid: validCategory });
+  }
+});
 
+// code for pdf generation on deployment
+const getBrowserInstance = async () => {
+  return await chromium.puppeteer.launch({
+    args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath,
+    headless: chromium.headless,
+  });
+};
+
+app.post("/generate-pdf-3", async (req, res) => {
+  const ReqCategory = req.body.category.toUpperCase();
+  const validCategory = [
+    "CASH",
+    "UPI",
+    "CHEQUE",
+    "NETBANKING",
+    "CREDIT CARD",
+    "ALL",
+  ];
+
+  if (!validCategory.includes(ReqCategory)) {
+    return res.json({ error: "Invalid Category", valid: validCategory });
+  }
+
+  try {
     const snapshot = await db.collection("expense").get();
-
     const data = snapshot.docs.map((doc) => {
       const docData = doc.data();
-      // console.log(docData.date);
-      const timestamp = docData.date; //storing date in form of firestore timestamp
-      const jsDate = timestamp.toDate(); // storing date in Javascript format
-      //Converting date into IST time format i.e. timezone=Asia/Kolkata
+      const jsDate = docData.date.toDate();
       const formattedDate = jsDate.toLocaleString(undefined, {
         timeZone: "Asia/Kolkata",
       });
-      // console.log(formattedDate);
-      return {
-        id: doc.id,
-        formattedDate: formattedDate,
-        jsDate: jsDate,
-        ...docData,
-      };
+      return { id: doc.id, formattedDate, jsDate, ...docData };
     });
-    data.sort((a, b) => a.jsDate - b.jsDate); ///Sorting according to date
-    //condition for filtering the elements
+
+    data.sort((a, b) => a.jsDate - b.jsDate);
+    let NewData;
     if (ReqCategory === "ALL") {
-      var NewData = data;
+      NewData = data;
     } else {
-      var NewData = data.filter((doc) => doc.category === ReqCategory);
+      NewData = data.filter((doc) => doc.category === ReqCategory);
     }
 
-    // Generating HTML content using EJS, sending passing NewData to template.ejs
     const htmlContent = await ejs.renderFile(
       path.join(__dirname, "template.ejs"),
       { NewData }
     );
+    const browser = await getBrowserInstance();
+    const page = await browser.newPage();
+    await page.setContent(htmlContent, { waitUntil: "load" });
 
-    // Define the local path
-    const localPath = path.join(
-      "C:",
-      "Users",
-      "Rahul",
-      "Downloads",
-      "output.pdf"
-    );
+    const pdfBuffer = await page.pdf({ format: "A4" });
+    await browser.close();
 
-    // Create PDF from HTML content
-    pdf.create(htmlContent).toFile(localPath, (error, result) => {
-      if (error) {
-        console.error(error);
-        return res.status(500).json({ error: error.message });
-      }
+    const fileName = `table-data-${Date.now()}.pdf`;
+    const file = bucket.file(fileName);
+    await file.save(pdfBuffer);
 
-      // Send success as the response
-      res.json({ status: "Success" });
-    });
+    const URL = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+    res.json({ link: URL });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+    console.error("Error generating PDF:", error);
+    res.status(500).json({ error: error.message, stack: error.stack });
   }
 });
 
-exports.api = onRequest(app); // Export function
+exports.api = onRequest({ memory: "2GiB", timeout: 120 }, app); // Export function
 
-//--------------------------------------------------------------------------------------------------------------------
 //Triggers
 
 //Trigger for creation of new doc
