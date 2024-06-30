@@ -7,7 +7,7 @@ const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const path = require("path");
 const ejs = require("ejs");
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
 const chromium = require("chrome-aws-lambda");
 const { Storage } = require("@google-cloud/storage");
 const storage = new Storage();
@@ -166,123 +166,137 @@ app.put("/expense/:id", async (req, res) => {
 //pdf generation api
 
 // code for pdf generation in local env
-app.post("/generate-pdf-local", async (req, res) => {
-  const ReqCategory = req.body.category.toUpperCase(); //Extracting category and storing it in variable in uppercase form
-  const validCategory = [
-    "CASH",
-    "UPI",
-    "CHEQUE",
-    "NETBANKING",
-    "CREDIT CARD",
-    "ALL",
-  ];
-  //check if category provided is valid or not
-  if (validCategory.includes(ReqCategory)) {
-    try {
-      const snapshot = await db.collection("expense").get(); //get the snapshot of all datasets
-      const data = snapshot.docs.map((doc) => {
-        const docData = doc.data();
-        // console.log(docData.date);
-        const timestamp = docData.date; //storing date in form of firestore timestamp
-        const jsDate = timestamp.toDate(); // storing date in Javascript format
-        //Converting date into IST time format i.e. timezone=Asia/Kolkata
-        const formattedDate = jsDate.toLocaleString(undefined, {
-          timeZone: "Asia/Kolkata",
-        });
-        // console.log(formattedDate);
-        return {
-          id: doc.id,
-          formattedDate: formattedDate,
-          jsDate: jsDate,
-          ...docData,
-        };
-      });
-      data.sort((a, b) => a.jsDate - b.jsDate); ///Sorting according to date
-      //condition for filtering the elements
-      if (ReqCategory === "ALL") {
-        var NewData = data;
-      } else {
-        var NewData = data.filter((doc) => doc.category === ReqCategory);
-      }
+// app.post("/generate-pdf-local", async (req, res) => {
+//   const ReqCategory = req.body.category.toUpperCase(); //Extracting category and storing it in variable in uppercase form
+//   const validCategory = [
+//     "CASH",
+//     "UPI",
+//     "CHEQUE",
+//     "NETBANKING",
+//     "CREDIT CARD",
+//     "ALL",
+//   ];
+//   //check if category provided is valid or not
+//   if (validCategory.includes(ReqCategory)) {
+//     try {
+//       const snapshot = await db.collection("expense").get(); //get the snapshot of all datasets
+//       const data = snapshot.docs.map((doc) => {
+//         const docData = doc.data();
+//         // console.log(docData.date);
+//         const timestamp = docData.date; //storing date in form of firestore timestamp
+//         const jsDate = timestamp.toDate(); // storing date in Javascript format
+//         //Converting date into IST time format i.e. timezone=Asia/Kolkata
+//         const formattedDate = jsDate.toLocaleString(undefined, {
+//           timeZone: "Asia/Kolkata",
+//         });
+//         // console.log(formattedDate);
+//         return {
+//           id: doc.id,
+//           formattedDate: formattedDate,
+//           jsDate: jsDate,
+//           ...docData,
+//         };
+//       });
+//       data.sort((a, b) => a.jsDate - b.jsDate); ///Sorting according to date
+//       //condition for filtering the elements
+//       if (ReqCategory === "ALL") {
+//         var NewData = data;
+//       } else {
+//         var NewData = data.filter((doc) => doc.category === ReqCategory);
+//       }
 
-      // Generating HTML content using EJS, sending passing NewData to template.ejs
-      const htmlContent = await ejs.renderFile(
-        path.join(__dirname, "template.ejs"),
-        { NewData }
-      );
+//       // Generating HTML content using EJS, sending passing NewData to template.ejs
+//       const htmlContent = await ejs.renderFile(
+//         path.join(__dirname, "template.ejs"),
+//         { NewData }
+//       );
 
-      // // Define the local path
-      // const localPath = path.join(
-      //   "C:",
-      //   "Users",
-      //   "Rahul",
-      //   "Downloads",
-      //   "output.pdf"
-      // );
+//       // // Define the local path
+//       // const localPath = path.join(
+//       //   "C:",
+//       //   "Users",
+//       //   "Rahul",
+//       //   "Downloads",
+//       //   "output.pdf"
+//       // );
 
-      // Create PDF from HTML content
-      // pdf.create(htmlContent).toFile(localPath, (error, result) => {
-      //   if (error) {
-      //     console.error(error);
-      //     return res.status(500).json({ error: error.message });
-      //   }
+//       // Create PDF from HTML content
+//       // pdf.create(htmlContent).toFile(localPath, (error, result) => {
+//       //   if (error) {
+//       //     console.error(error);
+//       //     return res.status(500).json({ error: error.message });
+//       //   }
 
-      //   // Send success as the response
-      //   res.json({ status: "Success" });
-      // });
-      // pdf.create(htmlContent).toBuffer(async (error, buffer) => {
-      //   if (error) {
-      //     return res.json({ error: error.message });
-      //   }
+//       //   // Send success as the response
+//       //   res.json({ status: "Success" });
+//       // });
+//       // pdf.create(htmlContent).toBuffer(async (error, buffer) => {
+//       //   if (error) {
+//       //     return res.json({ error: error.message });
+//       //   }
 
-      //   const fileName = `table-data-${Date.now()}.pdf`;
-      //   const file = bucket.file(fileName);
+//       //   const fileName = `table-data-${Date.now()}.pdf`;
+//       //   const file = bucket.file(fileName);
 
-      //   await file.save(buffer);
+//       //   await file.save(buffer);
 
-      //   const URL = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+//       //   const URL = `https://storage.googleapis.com/${bucketName}/${fileName}`;
 
-      //   res.json({ link: URL });
-      // });
+//       //   res.json({ link: URL });
+//       // });
 
-      const browser = await puppeteer.launch({
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      });
+//       const browser = await puppeteer.launch({
+//         args: ["--no-sandbox", "--disable-setuid-sandbox"],
+//       });
 
-      const page = await browser.newPage();
-      await page.setContent(htmlContent);
-      const pdfBuffer = await page.pdf({ format: "A4" });
-      await browser.close();
+//       const page = await browser.newPage();
+//       await page.setContent(htmlContent);
+//       const pdfBuffer = await page.pdf({ format: "A4" });
+//       await browser.close();
 
-      const fileName = `table-data-${Date.now()}.pdf`;
-      const file = bucket.file(fileName);
+//       const fileName = `table-data-${Date.now()}.pdf`;
+//       const file = bucket.file(fileName);
 
-      await file.save(pdfBuffer);
+//       await file.save(pdfBuffer);
 
-      const URL = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+//       const URL = `https://storage.googleapis.com/${bucketName}/${fileName}`;
 
-      res.json({ link: URL });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: error.message, stack: error.stack });
-    }
-  } else {
-    return res.json({ error: "Invalid Category", valid: validCategory });
-  }
-});
+//       res.json({ link: URL });
+//     } catch (error) {
+//       console.error(error);
+//       res.status(500).json({ error: error.message, stack: error.stack });
+//     }
+//   } else {
+//     return res.json({ error: "Invalid Category", valid: validCategory });
+//   }
+// });
 
-// code for pdf generation on deployment
-const getBrowserInstance = async () => {
-  return await chromium.puppeteer.launch({
+const generatePDF = async (data) => {
+  const htmlContent = await ejs.renderFile(
+    path.join(__dirname, "template.ejs"),
+    { NewData: data }
+  );
+  const fileName = `table-data-${Date.now()}.pdf`;
+  const browser = await puppeteer.launch({
     args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"],
     defaultViewport: chromium.defaultViewport,
     executablePath: await chromium.executablePath,
     headless: chromium.headless,
   });
+
+  const page = await browser.newPage();
+  await page.setContent(htmlContent);
+  const pdfBuffer = await page.pdf({ format: "A4" });
+  await browser.close();
+
+  const file = bucket.file(fileName);
+  await file.save(pdfBuffer);
+
+  return `https://storage.googleapis.com/${bucketName}/${fileName}`;
 };
 
-app.post("/generate-pdf-deploy", async (req, res) => {
-  const ReqCategory = req.body.category.toUpperCase();
+app.post("/generate-pdf", async (req, res) => {
+  const reqCategory = req.body.category.toUpperCase();
   const validCategory = [
     "CASH",
     "UPI",
@@ -292,7 +306,7 @@ app.post("/generate-pdf-deploy", async (req, res) => {
     "ALL",
   ];
 
-  if (!validCategory.includes(ReqCategory)) {
+  if (!validCategory.includes(reqCategory)) {
     return res.json({ error: "Invalid Category", valid: validCategory });
   }
 
@@ -308,30 +322,16 @@ app.post("/generate-pdf-deploy", async (req, res) => {
     });
 
     data.sort((a, b) => a.jsDate - b.jsDate);
-    let NewData;
-    if (ReqCategory === "ALL") {
-      NewData = data;
+    let filterData;
+    if (reqCategory === "ALL") {
+      filterData = data;
     } else {
-      NewData = data.filter((doc) => doc.category === ReqCategory);
+      filterData = data.filter((doc) => doc.category === reqCategory);
     }
 
-    const htmlContent = await ejs.renderFile(
-      path.join(__dirname, "template.ejs"),
-      { NewData }
-    );
-    const browser = await getBrowserInstance();
-    const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: "load" });
+    const url = await generatePDF(filterData);
 
-    const pdfBuffer = await page.pdf({ format: "A4" });
-    await browser.close();
-
-    const fileName = `table-data-${Date.now()}.pdf`;
-    const file = bucket.file(fileName);
-    await file.save(pdfBuffer);
-
-    const URL = `https://storage.googleapis.com/${bucketName}/${fileName}`;
-    res.json({ link: URL });
+    res.json({ link: url });
   } catch (error) {
     console.error("Error generating PDF:", error);
     res.status(500).json({ error: error.message, stack: error.stack });
