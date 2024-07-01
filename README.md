@@ -11,10 +11,7 @@ Signup New user :https://api-ykrpkwpqva-uc.a.run.app/expense/signup
 POST-pdf generation : https://api-ykrpkwpqva-uc.a.run.app/generate-pdf
 
 While Testing generate-pdf API kindly add value for the key "category" in Body section of POSTMAN
-<<<<<<< HEAD
 
 ![alt text](image.png)
 
 Value for category can be : "CASH","UPI","CHEQUE","NETBANKING","CREDIT CARD", "ALL",
-=======
->>>>>>> 41b3142169103ccfc82b392b88e8479476f2440a
