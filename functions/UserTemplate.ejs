@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Table</title>
+    <style>
+      h1{
+        text-align: center;
+      }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid black
+        }
+      
+        th{
+          padding: 8px;
+          text-align: left;
+          border: 1px solid black
+        }
+         td {
+        padding: 8px;
+            white-space: nowrap;
+            text-align: left;
+            border: 1px solid black
+        }
+    </style>
+</head>
+<body>
+    <h2>Personal Budget Tracker</h2>   
+    <p>   Name :
+      <%= userData[0].Name %>
+    </p> 
+    <table>
+        <thead>
+            <tr>
+              <th>SrNo</th>
+                <th>Date and Time</th>
+                <th>Amount</th>
+                <th>Category</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% NewData.forEach((item,index) => { %>
+                <tr>
+                   <td><%= index +1 %></td>
+                    <td><%= item.formattedDate %></td>
+                    <td><%= item.amount %></td>
+                    <td><%= item.category %></td>
+                    <td><%= item.description %></td>
+                    
+                </tr>
+            <% }); %>
+        </tbody>
+    </table>
+    <footer>
+      <p> Created At : <%= userData[1].DateAndTime  %></p>
+    </footer>
+</body>
+</html>
